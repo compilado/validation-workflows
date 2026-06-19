@@ -45,8 +45,10 @@ jobs:
             | jq -r '.value')
 
           # 2) Monta o corpo JSON com seguranca (jq -n evita problema de aspas).
+          #    base_url = a propria URL da API, para ela montar o link do certificado.
           BODY=$(jq -n --arg jwt "$TOKEN" --arg course "${{ inputs.course }}" \
-            '{jwt: $jwt, course: $course, gate_passed: true}')
+            --arg base_url "${{ inputs.api_url }}" \
+            '{jwt: $jwt, course: $course, gate_passed: true, base_url: $base_url}')
 
           echo "Enviando para ${{ inputs.api_url }}/v1/validate ..."
           RESP=$(curl -sS -X POST "${{ inputs.api_url }}/v1/validate" \
@@ -59,3 +61,5 @@ jobs:
           # 3) Falha o job se a API nao aprovou (status != approved).
           echo "$RESP" | jq -e '.status == "approved"' > /dev/null \
             || { echo "Validacao NAO aprovada."; exit 1; }
+
+          echo "🎉 Certificado: $(echo "$RESP" | jq -r '.certificate_url // "—"')"
