@@ -1,0 +1,52 @@
+# Workflow OFICIAL da plataforma (reusable workflow).
+# Vive no SEU repositório (commitcert/validation-workflows), separado do aluno.
+# O repo do aluno NÃO roda os testes sozinho — ele apenas CHAMA este arquivo.
+# Como este arquivo está no seu repo, o aluno não consegue alterá-lo: é isso
+# que faz o claim job_workflow_ref do OIDC apontar para algo confiável.
+
+name: CommitCert Validate (oficial)
+
+# "workflow_call" = este workflow só roda quando OUTRO workflow o chama.
+on:
+  workflow_call:
+    inputs:
+      course:
+        description: "ID do curso (ex.: backend-go-03-http)"
+        required: true
+        type: string
+
+permissions:
+  id-token: write   # para pedir o cracha OIDC
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      # checkout aqui baixa o repo do ALUNO (o repo que disparou a chamada).
+      - name: Baixar o codigo do aluno
+        uses: actions/checkout@v4
+
+      - name: Preparar o Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # GATE: os testes travados precisam passar (RFC §7).
+      - name: Rodar os testes travados (gate)
+        run: node --test
+
+      # Pede o cracha OIDC e mostra as claims. Repare que agora o
+      # job_workflow_ref vai apontar para ESTE repo oficial, nao para o do aluno.
+      - name: Pedir o cracha OIDC e mostrar as claims
+        run: |
+          TOKEN=$(curl -sS \
+            -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api.commitcert.io" \
+            | jq -r '.value')
+
+          echo "$TOKEN" | python3 -c "import sys,base64,json; p=sys.stdin.read().strip().split('.')[1]; p+='='*(-len(p)%4); print(json.dumps(json.loads(base64.urlsafe_b64decode(p)), indent=2))" > claims.json
+
+          echo '=== Claims do cracha OIDC (rodando pelo workflow OFICIAL) ==='
+          jq '{repository, sha, job_workflow_ref, actor, aud, iss, exp}' claims.json
+          echo "curso recebido pela plataforma: ${{ inputs.course }}"
