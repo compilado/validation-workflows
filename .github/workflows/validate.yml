@@ -16,7 +16,7 @@ on:
         description: "URL publica da API (default = producao; dev sobrescreve com o tunel)"
         required: false
         type: string
-        default: "https://api.commitcert.io"
+        default: https://commitcert-api-525514262747.us-central1.run.app
 
 permissions:
   id-token: write   # para pedir o cracha OIDC
